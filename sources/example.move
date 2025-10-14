@@ -35,3 +35,24 @@ public fun strength(self: &Sword) : u64 {
 public fun swords_created(self: &Forge): u64 {
     self.swords_created
 }
+
+
+#[test]
+fun test_sword_create(){
+
+    let mut ctx = tx_context::dummy();
+
+
+    let sword = Sword {
+        id: object::new(&mut ctx),
+        magic: 42,
+        strength: 7,
+    };
+
+    assert!(sword.magic() == 42 && sword.strength() == 7 , 1);
+
+
+    let dummy_address = @0xCAFE;
+
+    transfer::public_transfer(sword, dummy_address);
+}
