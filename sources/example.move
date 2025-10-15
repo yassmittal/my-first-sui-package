@@ -1,7 +1,5 @@
 module my_first_package::example;
 
-use bridge::bridge_env::scenario;
-
 public struct Sword has key, store {
     id: UID,
     magic: u64,
@@ -49,6 +47,16 @@ public fun sword_create(magic: u64, strength: u64, ctx: &mut TxContext) : Sword{
     
 }
 
+public fun new_sword(forge: &mut Forge, magic: u64, strength: u64, ctx: &mut TxContext) : Sword {
+    forge.swords_created = forge.swords_created + 1;
+
+    Sword {
+        id: object::new(ctx),
+        magic,
+        strength,
+    }
+}
+ 
 
 #[test]
 fun test_sword_create(){
@@ -70,14 +78,10 @@ fun test_sword_create(){
     transfer::public_transfer(sword, dummy_address);
 }
 
-
-
-
 #[test]
 fun test_sword_transactions() {
     use sui::test_scenario;
 
-    // Create test addresses representing users
     let initial_owner = @0xCAFE;
     let final_owner = @0xFACE;
 
@@ -85,9 +89,7 @@ fun test_sword_transactions() {
 
     let mut scenario = test_scenario::begin(initial_owner);
 
-
     {
-    // Create the sword and transfer it to initial owner
         let sword = sword_create(42, 7, scenario.ctx());
         transfer::public_transfer(sword, initial_owner);
     };
@@ -95,26 +97,64 @@ fun test_sword_transactions() {
     // Second transaction executed by the initial sword owner
 
     scenario.next_tx(initial_owner);
+
     {
-        // Extract the sword owned by the initial owner
         let sword = scenario.take_from_sender<Sword>();
         transfer::public_transfer(sword, final_owner);
     };
 
-    // Third transaction executed by the final sword owner
-   
+
     scenario.next_tx(final_owner);
-        {
-            // Extract the sword owned by final owner
-            let sword = scenario.take_from_sender<Sword>();
 
-            // Verify that the sword has expected properties
-            assert!(sword.magic() == 42 && sword.strength() == 7 , 1);
+    {
+        let sword = scenario.take_from_sender<Sword>();
 
-            // Return the sword to the object pool(it can not be simply "dropped")
-            scenario.return_to_sender(sword)
-        };
+        assert!(sword.magic() == 42 && sword.strength() == 7 , 1);
 
-        scenario.end();
+        scenario.return_to_sender(sword);
+    };
 
+    scenario.end(); 
+}
+
+
+
+#[test]
+fun test_module_init() {
+    use sui::test_scenario;
+
+    // Create test addresses representing users
+    let admin = @0xAD;
+    let initial_owner = @0xCAFE;
+
+    let mut scenario = test_scenario::begin(admin);
+    {
+        init(scenario.ctx());
+    };
+
+    // Second transaction to check if the forge has been created and has the initial value of zero swords created
+
+    scenario.next_tx(admin);
+    {
+        let forge = scenario.take_from_sender<Forge>();
+        assert!(forge.swords_created() == 0 , 1);
+        scenario.return_to_sender(forge);
+    };
+
+    // Third transaction executed by admin to create the sword
+    scenario.next_tx(admin);
+
+    {
+
+        let mut forge = scenario.take_from_sender<Forge>();
+
+        // Create the swrod and transfer it to initial owner;
+
+        let sword = forge.new_sword(42, 7 , scenario.ctx());
+
+        transfer::public_transfer(sword, initial_owner);
+        scenario.return_to_sender(forge);
+    };
+
+    scenario.end();
 }
